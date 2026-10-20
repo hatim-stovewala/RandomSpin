@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Random Spinner</title>
+<style>
+  :root {
+    --bg: #f3f5f8; --card: #ffffff; --text: #1b1d21; --muted: #6b7280;
+    --accent: #1e88e5; --accent-text: #ffffff; --border: #d4d9e0; --chip: #eaeef3;
+    --error: #c62828;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121418; --card: #1c1f25; --text: #eceef2; --muted: #9aa3b0;
+      --accent: #4da3f0; --accent-text: #0b1118; --border: #343a44; --chip: #2a2f38;
+      --error: #ef7a7a;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; }
+  .wrap { max-width: 460px; margin: 0 auto; padding: 24px 16px 48px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px; display: flex; flex-direction: column; gap: 16px; align-items: center; }
+  h1 { margin: 0; font-size: 26px; text-align: center; }
+  .row { display: flex; gap: 12px; width: 100%; }
+  .row label { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+  input[type=text] { font: inherit; font-size: 18px; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text); width: 100%; }
+  input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+  button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; padding: 10px 18px;
+    background: var(--accent); color: var(--accent-text); font-weight: 600; }
+  button.secondary { background: var(--chip); color: var(--text); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  #spinBtn { width: 100%; font-size: 18px; padding: 14px; }
+  .toggle { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 15px; cursor: pointer; }
+  .error { color: var(--error); min-height: 1.2em; font-size: 14px; margin: 0; }
+  #result { font-size: 64px; font-weight: 800; line-height: 1; min-height: 1em; }
+  .muted { color: var(--muted); font-size: 14px; margin: 0; }
+  canvas { max-width: 100%; height: auto; }
+  .history { width: 100%; }
+  .history h2 { font-size: 15px; margin: 0 0 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 140px; overflow-y: auto; }
+  .chip { background: var(--chip); border-radius: 999px; padding: 4px 12px; font-size: 14px; }
+  .hint { font-size: 12px; color: var(--muted); text-align: center; margin: 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>Random Spinner</h1>
+
+    <label class="toggle"><input type="checkbox" id="soundToggle"> Sound</label>
+
+    <div class="row">
+      <label>Min <input type="text" id="minInput" inputmode="numeric" autocomplete="off"></label>
+      <label>Max <input type="text" id="maxInput" inputmode="numeric" autocomplete="off"></label>
+    </div>
+    <p class="error" id="error"></p>
+    <button id="setBtn">Set range</button>
+
+    <div id="game" hidden style="width:100%; display:flex; flex-direction:column; gap:16px; align-items:center;">
+      <canvas id="wheel" width="360" height="380" style="width:360px;height:380px;"></canvas>
+      <div id="result">—</div>
+      <button id="spinBtn">SPIN</button>
+      <p class="muted" id="remaining"></p>
+      <div class="history" id="historyBox" hidden>
+        <h2>History</h2>
+        <div class="chips" id="chips"></div>
+      </div>
+      <p class="hint">Tip: press Space or Enter to spin</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var KEY = "randomSpinnerState.v1";
+  var COLORS = ["#E53935", "#EF6C00", "#F9A825", "#43A047", "#00ACC1", "#1E88E5", "#8E24AA", "#D81B60"];
+  var MAX_SEG = 100;
+  var MAX_RANGE = 100000;
+
+  // Saved state. The shuffled order is not stored: only seed + used count, so it is restored exactly.
+  var S = { minText: "1", maxText: "100", ready: false, rMin: 1, rMax: 100,
+            seed: 0, used: 0, segs: [], rotation: 0, sound: true };
+  var pool = [];
+  var spinning = false;
+  var audio = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var canvas = $("wheel"), ctx = canvas.getContext("2d");
+
+  /* ---------- storage ---------- */
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) Object.assign(S, JSON.parse(raw));
+    } catch (e) { /* storage unavailable: run without saving */ }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+  }
+
+  /* ---------- seeded shuffle ---------- */
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function buildPool(min, max, seed) {
+    var n = max - min + 1, a = new Array(n), i;
+    for (i = 0; i < n; i++) a[i] = min + i;
+    var rnd = mulberry32(seed);
+    for (i = n - 1; i > 0; i--) {
+      var j = Math.floor(rnd() * (i + 1));
+      var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+
+  function mod360(x) { return ((x % 360) + 360) % 360; }
+
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+
+  // Numbers shown on the wheel: all remaining if <= 12, else a random sample (winner always included).
+  function pickSegments(used, mustInclude) {
+    var remaining = pool.length - used;
+    if (remaining <= 0) return [];
+    if (remaining <= MAX_SEG) return shuffle(pool.slice(used));
+    var taken = {}, result = [];
+    if (mustInclude !== null) { result.push(mustInclude); taken[used] = true; }
+    while (result.length < MAX_SEG) {
+      var idx = used + Math.floor(Math.random() * (pool.length - used));
+      if (!taken[idx]) { taken[idx] = true; result.push(pool[idx]); }
+    }
+    return shuffle(result);
+  }
+
+  /* ---------- sound ---------- */
+  function ensureAudio() {
+    if (!audio) {
+      try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; }
+    }
+    if (audio && audio.state === "suspended") audio.resume();
+  }
+  function beep(freq, dur, vol, when) {
+    if (!audio) return;
+    var t0 = audio.currentTime + (when || 0);
+    var o = audio.createOscillator(), g = audio.createGain();
+    o.type = "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(audio.destination);
+    o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  function tick() { if (S.sound) beep(1000, 0.03, 0.18); }
+  function finishSound() {
+    if (!S.sound) return;
+    beep(660, 0.18, 0.25, 0);
+    beep(880, 0.28, 0.25, 0.14);
+  }
+
+  /* ---------- drawing ---------- */
+  function draw() {
+    var W = 360, H = 380;
+    var dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== W * dpr) { canvas.width = W * dpr; canvas.height = H * dpr; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    var cx = W / 2, cy = 205, r = 165;
+    var segs = S.segs, n = segs.length;
+
+    if (n > 0) {
+      var sweep = (Math.PI * 2) / n;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(S.rotation * Math.PI / 180);
+      for (var i = 0; i < n; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, r, i * sweep, (i + 1) * sweep);
+        ctx.closePath();
+        ctx.fillStyle = COLORS[i % COLORS.length];
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(255,255,255,0.6)";
+        ctx.stroke();
+
+        var label = String(segs[i]);
+        var textR = r * 0.62;
+        var arcLimit = textR * sweep * 0.8;
+        var size = Math.min(26, (r * 0.95) / label.length, arcLimit);
+        ctx.save();
+        ctx.rotate((i + 0.5) * sweep);
+        ctx.font = "700 " + size + "px 'Segoe UI', Arial, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.shadowColor = "rgba(0,0,0,0.6)";
+        ctx.shadowBlur = 4;
+        ctx.fillStyle = "#fff";
+        ctx.fillText(label, textR, 0);
+        ctx.restore();
+      }
+      ctx.restore();
+
+      // hub
+      ctx.beginPath();
+      ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#333";
+      ctx.stroke();
+    }
+
+    // pointer (top)
+    ctx.beginPath();
+    ctx.moveTo(cx - 16, 4);
+    ctx.lineTo(cx + 16, 4);
+    ctx.lineTo(cx, 46);
+    ctx.closePath();
+    ctx.fillStyle = "#111";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#fff";
+    ctx.stroke();
+  }
+
+  /* ---------- UI ---------- */
+  function render() {
+    $("game").hidden = !S.ready;
+    $("setBtn").textContent = S.ready ? "Reset with this range" : "Set range";
+    $("setBtn").disabled = spinning;
+    $("minInput").disabled = spinning;
+    $("maxInput").disabled = spinning;
+    if (!S.ready) return;
+
+    var used = Math.min(S.used, pool.length);
+    var remaining = pool.length - used;
+    $("result").textContent = used > 0 ? String(pool[used - 1]) : "—";
+    $("remaining").textContent = "Remaining: " + (spinning ? remaining - 1 : remaining) + " of " + pool.length;
+
+    var btn = $("spinBtn");
+    btn.disabled = spinning || remaining <= 0;
+    btn.textContent = spinning ? "Spinning…" : (remaining <= 0 ? "All numbers used" : "SPIN");
+
+    var chips = $("chips");
+    chips.innerHTML = "";
+    var hist = pool.slice(0, used).reverse();
+    hist.forEach(function (n) {
+      var s = document.createElement("span");
+      s.className = "chip";
+      s.textContent = n;
+      chips.appendChild(s);
+    });
+    $("historyBox").hidden = hist.length === 0;
+    draw();
+  }
+
+  function setError(msg) { $("error").textContent = msg || ""; }
+
+  /* ---------- actions ---------- */
+  function startRange() {
+    var minT = $("minInput").value.trim(), maxT = $("maxInput").value.trim();
+    var okInt = /^-?\d+$/;
+    if (!okInt.test(minT) || !okInt.test(maxT)) return setError("Enter valid whole numbers");
+    var min = parseInt(minT, 10), max = parseInt(maxT, 10);
+    if (min > max) return setError("Min must be \u2264 Max");
+    if (max - min + 1 > MAX_RANGE) return setError("Range too large (max 100,000 numbers)");
+    setError("");
+    S.rMin = min; S.rMax = max;
+    S.seed = Math.floor(Math.random() * 4294967296);
+    S.used = 0;
+    S.ready = true;
+    pool = buildPool(min, max, S.seed);
+    S.segs = pickSegments(0, null);
+    save();
+    render();
+  }
+
+  function spin() {
+    if (spinning || !S.ready || S.used >= pool.length) return;
+    ensureAudio();
+
+    var next = pool[S.used];
+    S.segs = pickSegments(S.used, next);
+    var n = S.segs.length, sweep = 360 / n;
+    var k = S.segs.indexOf(next);
+
+    // Land segment k under the pointer (top = 270 degrees), with jitter inside the segment.
+    var jitter = (Math.random() - 0.5) * sweep * 0.7;
+    var desired = mod360(270 - (k + 0.5) * sweep + jitter);
+    var start = S.rotation;
+    var target = start + 360 * 5 + mod360(desired - start);
+
+    spinning = true;
+    render();
+    tick();
+
+    var t0 = performance.now(), dur = 3500, lastIdx = -1, lastTick = 0;
+    function frame(now) {
+      var p = Math.min(1, (now - t0) / dur);
+      var e = 1 - Math.pow(1 - p, 3);
+      S.rotation = start + (target - start) * e;
+
+      var idx = Math.floor(mod360(270 - S.rotation) / sweep);
+      if (idx !== lastIdx) {
+        lastIdx = idx;
+        if (now - lastTick >= 55) { lastTick = now; tick(); }
+      }
+      draw();
+
+      if (p < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        S.rotation = mod360(S.rotation);
+        S.used += 1;
+        spinning = false;
+        finishSound();
+        save();
+        render();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- init ---------- */
+  load();
+  $("minInput").value = S.minText;
+  $("maxInput").value = S.maxText;
+  $("soundToggle").checked = !!S.sound;
+
+  if (S.ready) {
+    try {
+      pool = buildPool(S.rMin, S.rMax, S.seed);
+      if (S.used > pool.length) S.used = pool.length;
+      if (!S.segs || S.segs.length === 0) S.segs = pickSegments(S.used, null);
+    } catch (e) { S.ready = false; pool = []; }
+  }
+
+  $("minInput").addEventListener("input", function () { S.minText = this.value; save(); });
+  $("maxInput").addEventListener("input", function () { S.maxText = this.value; save(); });
+  $("soundToggle").addEventListener("change", function () { S.sound = this.checked; save(); if (S.sound) ensureAudio(); });
+  $("setBtn").addEventListener("click", startRange);
+  $("spinBtn").addEventListener("click", spin);
+
+  [$("minInput"), $("maxInput")].forEach(function (el) {
+    el.addEventListener("keydown", function (e) { if (e.key === "Enter") startRange(); });
+  });
+  document.addEventListener("keydown", function (e) {
+    var tag = (document.activeElement && document.activeElement.tagName) || "";
+    if (tag === "INPUT" || tag === "BUTTON") return;
+    if (e.key === " " || e.key === "Enter") { e.preventDefault(); spin(); }
+  });
+
+  render();
+  draw();
+})();
+</script>
+</body>
+</html>
