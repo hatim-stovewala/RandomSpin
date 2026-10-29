@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Random Spinner</title>
+<title>RBC 2027 Auction</title>
 <style>
   :root {
     --bg: #f3f5f8; --card: #ffffff; --text: #1b1d21; --muted: #6b7280;
@@ -21,7 +21,7 @@
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--text);
-    font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; }
+    font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; background-image: url("grass-background.jpg");}
   .wrap { max-width: 720px; margin: 0 auto; padding: 0px 16px 48px; }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px;
     padding: 5px; display: flex; flex-direction: column; gap: 16px; align-items: center; }
@@ -78,9 +78,9 @@
 <body>
 <div class="wrap">
   <div class="card">
-    <h1>Random Spinner</h1>
+    <h1>RBC 2027 Auction</h1>
 <details class="range-panel">
-    <summary>⚙️ Range Settings</summary>
+    <summary>⚙️</summary>
     <div class="range-controls"></div>
     <label class="toggle"><input type="checkbox" id="soundToggle"> Sound</label>
 
@@ -111,7 +111,20 @@
   "use strict";
 
   var KEY = "randomSpinnerState.v1";
-  var COLORS = ["#E53935", "#EF6C00", "#F9A825", "#43A047", "#00ACC1", "#1E88E5", "#8E24AA", "#D81B60"];
+  var COLORS = [
+  "#FF007F",
+  "#00F0FF",
+  "#FFE600",
+  "#7B2CBF",
+  "#05FFA1",
+  "#FF5400",
+  "#0077B6",
+  "#D90429",
+  "#38B000",
+  "#9D4EDD"
+]
+//["#D4AF37",  "#3A5F56",  "#C0C0C0",  "#6E7F80",  "#B87333",  "#43B3AE",  "#F3E5AB",  "#8B4513",  "#B76E79",  "#36454F"]
+//["#7ddf64", "#c0df85", "#deb986", "#db6c79", "#ed4d6e"] //["#E53935", "#EF6C00", "#F9A825", "#43A047", "#00ACC1", "#1E88E5", "#8E24AA", "#D81B60"]; //["#c6d4ff", "#7a82ab", "#307473", "#12664f", "#2dc2bd"] //
   var MAX_SEG = 100;
   var MAX_RANGE = 100000;
 
@@ -198,11 +211,11 @@
     o.connect(g); g.connect(audio.destination);
     o.start(t0); o.stop(t0 + dur + 0.02);
   }
-  function tick() { if (S.sound) beep(1000, 0.03, 0.18); }
+  function tick() { if (S.sound) beep(1000, 0.05, 1); }
   function finishSound() {
     if (!S.sound) return;
-    beep(660, 0.18, 0.25, 0);
-    beep(880, 0.28, 0.25, 0.14);
+    beep(660, 0.18, 1, 0);
+    beep(880, 0.28, 1, 0.14);
   }
 
   /* ---------- drawing ---------- */
@@ -343,7 +356,7 @@
     render();
     tick();
 
-    var t0 = performance.now(), dur = 2000, lastIdx = -1, lastTick = 0; // set Spin duration in MS - Seconds * 1000
+    var t0 = performance.now(), dur = 3000, lastIdx = -1, lastTick = 0; // set Spin duration in MS - Seconds * 1000
     function frame(now) {
       var p = Math.min(1, (now - t0) / dur);
       var e = 1 - Math.pow(1 - p, 3);
