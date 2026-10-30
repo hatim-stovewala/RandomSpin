@@ -24,7 +24,7 @@
   html, body { margin: 0; background: var(--bg); color: var(--text);
     font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; background-image: url("./turf new.png"); background-size: cover;}
   .wrap { max-width: 1176px; max-height: 840px; margin: 0 auto; padding: 30px 16px 48px; }
-  .card {  border: 5px solid ; border-radius: 20px; padding: 5px; display: flex; flex-direction: column; gap: 10px; align-items: center; 
+  .card {  border: 5px solid ; border-radius: 20px; padding: 5px; display: flex; flex-direction: column; gap: 0px; align-items: center; 
   width: 50%;margin: 0 auto;}
   h1 { margin: 0; font-size: 60px; text-align: center; font-family: 'ADLaM Display'; }
   .logo1 {width: 250px;margin: 0 auto;padding: 0px;display: flex;}
@@ -39,17 +39,17 @@
     background: var(--accent); color: var(--accent-text); font-weight: 600; }
   button.secondary { background: var(--chip); color: var(--text); }
   button:disabled { opacity: .5; cursor: not-allowed; }
-  #spinBtn { width: 50%; font-size: 18px; padding: 14px; }
+  #spinBtn { width: 30%; font-size: 30px; padding: 5px; font-weight: bold; }
   .toggle { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 15px; cursor: pointer; }
   .error { color: var(--error); min-height: 1.2em; font-size: 14px; margin: 0; }
-  #result { font-size: 64px; font-weight: 800; line-height: 1; min-height: 1em; }
+  #result { font-size: 70px; font-weight: 800; line-height: 1; min-height: 1em; }
   .muted { color: black; font-size: 20px; margin: 0; font-weight: bold;}
   canvas { max-width: 100%; height: auto; }
   .history { width: 100%; }
   .history h2 { font-size: 20px; margin: 0 0 8px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 1000px; overflow-y: auto; }
   .chip { background: var(--chip); border-radius: 999px; padding: 4px 12px; font-size: 20px; font-weight: bold;}
-  .hint { font-size: 12px; color: var(--muted); text-align: center; margin: 0; }
+  .hint { font-size: 15px; color: black; text-align: center; margin: 0; font-weight: bold; }
   [hidden] { display: none !important; }
   .range-panel {
     margin: 0px 0;
@@ -97,7 +97,7 @@
     </div>
   
 </details>
-    <div id="game" hidden style="width:100%; display:flex; flex-direction:column; gap:16px; align-items:center;">
+    <div id="game" hidden style="width:100%; display:flex; flex-direction:column; gap:5px; align-items:center;">
       <canvas id="wheel" width="360" height="380" style="width:360px;height:380px;"></canvas>
       <div id="result">—</div>
       <button id="spinBtn">SPIN</button>
@@ -307,7 +307,7 @@
 
     var btn = $("spinBtn");
     btn.disabled = spinning || remaining <= 0;
-    btn.textContent = spinning ? "Spinning…" : (remaining <= 0 ? "All numbers used" : "SPIN");
+    btn.textContent = spinning ? "SPINNING…" : (remaining <= 0 ? "All numbers used" : "SPIN");
 
     var chips = $("chips");
     chips.innerHTML = "";
